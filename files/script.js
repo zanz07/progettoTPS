@@ -9,6 +9,18 @@ function moveTowards(current, target, maxDelta) {
   return current.add(diff.scale(maxDelta / dist))
 }
 
+function gameOver() {
+  add([
+    text("GAME OVER"),
+    rect(200, 75),
+    pos(540, 360),
+    fixed(),
+    anchor("center"),
+    color(255, 0, 0),
+    z(99),
+  ])
+}
+
 pSize = 32
 pBulletSize = 20
 enemySize = 32
@@ -78,7 +90,7 @@ function spawnEnemy(p) {
     const dist = diff.len()
     const minDist = enemySize
 
-    if (dist === 0 || dist >= minDist) return
+    if (dist == 0 || dist >= minDist) return
 
     const strength = (minDist - dist) / minDist
     const push = diff.unit().scale(strength * 100)
@@ -89,47 +101,138 @@ function spawnEnemy(p) {
   return enemy
 }
 
-const player = add([
-  rect(pSize, pSize),
-  pos(100, 100),
-  anchor("center"),
-  color(0, 0, 255),
-  area(),
-  z(2),
-  {
-    dir: vec2(0, 0),
-    vel: vec2(0, 0),
-    maxSpeed: 500,
-    accel: 5000,
-    friction: 7500,
-    fireRate: 0.1,
-    lastShot: 0,
-    targets: [
-      vec2(1, 0),
-      vec2(0, 1),
-      vec2(-1, 0),
-      vec2(0, -1)
-    ],
-    update() {
-      if(doUpdate){
-        let input = this.dir.clone()
-        if (input.len() > 0) {
-          input = input.unit()
+function createPlayer(p) {
+  const player = add([
+    rect(pSize, pSize),
+    pos(p),
+    anchor("center"),
+    color(0, 0, 255),
+    area(),
+    z(2),
+    health(1),
+    {
+      dir: vec2(0, 0),
+      vel: vec2(0, 0),
+      maxSpeed: 500,
+      accel: 5000,
+      friction: 7500,
+      fireRate: 0.0001,
+      lastShot: 0,
+      targets: [
+        vec2(1, 0),
+        vec2(0, 1),
+        vec2(-1, 0),
+        vec2(0, -1)
+      ],
+      update() {
+        if(doUpdate){
+          let input = this.dir.clone()
+          if (input.len() > 0) {
+            input = input.unit()
+          }
+
+          const target = input.scale(this.maxSpeed)
+
+          const rate = input.len() > 0 ? this.accel : this.friction
+
+          this.vel = moveTowards(this.vel, target, rate * dt())
+
+          this.move(this.vel)
         }
+        
+      }  
+    },
+    "player",
+  ])
+  //movement
+  onKeyDown("d", () => {
+    player.dir.x = 1
+  })
 
-        const target = input.scale(this.maxSpeed)
+  onKeyRelease("d", () => {
+    player.dir.x = 0
+  })
 
-        const rate = input.len() > 0 ? this.accel : this.friction
+  onKeyDown("a", () => {
+    player.dir.x = -1
+  })
 
-        this.vel = moveTowards(this.vel, target, rate * dt())
+  onKeyRelease("a", () => {
+    player.dir.x = 0
+  })
 
-        this.move(this.vel)
+  onKeyDown("w", () => {
+    player.dir.y = -1
+  })
+
+  onKeyRelease("w", () => {
+    player.dir.y = 0
+  })
+
+  onKeyDown("s", () => {
+    player.dir.y = 1
+  })
+
+  onKeyRelease("s", () => {
+    player.dir.y = 0
+  })
+
+  //shooting
+  onKeyDown("right", () => {
+      p = player.pos.clone()
+      d = vec2(1, 0)
+
+      if (time() - player.lastShot >= player.fireRate) {
+          spawnBullet(p,d)
+          player.lastShot = time()
       }
-      
-    }  
-  },
-  "player",
-])
+  })
+
+  onKeyDown("left", () => {
+      p = player.pos.clone()
+      d = vec2(-1, 0)
+
+      if (time() - player.lastShot >= player.fireRate) {
+          spawnBullet(p,d)
+          player.lastShot = time()
+      }
+  })
+
+  onKeyDown("up", () => {
+      p = player.pos.clone()
+      d = vec2(0, -1)
+
+      if (time() - player.lastShot >= player.fireRate) {
+          spawnBullet(p,d)
+          player.lastShot = time()
+      }
+  })
+
+  onKeyDown("down", () => {
+      p = player.pos.clone()
+      d = vec2(0, 1)
+
+      if (time() - player.lastShot >= player.fireRate) {
+          spawnBullet(p,d)
+          player.lastShot = time()
+      }
+  })
+
+  onCollide("player", "enemy", (p, e) => {
+    p.hurt(1)
+  })
+
+  player.onDeath(() => {
+    doUpdate = false
+    add([
+      text("GAME OVER", { size: 48 }),
+      pos(width() / 2, height() / 2 - 40),
+      anchor("center"),
+    ])
+  })
+
+  return player
+}
 
 const spawner = add([
   rect(64, 64),
@@ -158,86 +261,19 @@ const spawner = add([
   "spawner"
 ])
 
-onKeyDown("d", () => {
-  player.dir.x = 1
-})
-
-onKeyRelease("d", () => {
-  player.dir.x = 0
-})
-
-onKeyDown("a", () => {
-  player.dir.x = -1
-})
-
-onKeyRelease("a", () => {
-  player.dir.x = 0
-})
-
-onKeyDown("w", () => {
-  player.dir.y = -1
-})
-
-onKeyRelease("w", () => {
-  player.dir.y = 0
-})
-
-onKeyDown("s", () => {
-  player.dir.y = 1
-})
-
-onKeyRelease("s", () => {
-  player.dir.y = 0
-})
-
-onKeyDown("right", () => {
-    p = player.pos.clone()
-    d = vec2(1, 0)
-
-    if (time() - player.lastShot >= player.fireRate) {
-        spawnBullet(p,d)
-        player.lastShot = time()
-    }
-})
-
-onKeyDown("left", () => {
-    p = player.pos.clone()
-    d = vec2(-1, 0)
-
-    if (time() - player.lastShot >= player.fireRate) {
-        spawnBullet(p,d)
-        player.lastShot = time()
-    }
-})
-
-onKeyDown("up", () => {
-    p = player.pos.clone()
-    d = vec2(0, -1)
-
-    if (time() - player.lastShot >= player.fireRate) {
-        spawnBullet(p,d)
-        player.lastShot = time()
-    }
-})
-
-onKeyDown("down", () => {
-    p = player.pos.clone()
-    d = vec2(0, 1)
-
-    if (time() - player.lastShot >= player.fireRate) {
-        spawnBullet(p,d)
-        player.lastShot = time()
-    }
-})
+player = createPlayer(vec2(540, 360))
 
 onKeyPress("space", () => {
   doUpdate = !doUpdate
 })
 
-onCollide("enemy", "bullet", (e, b) =>{
-  destroy(b),
-  e.hurt(1)
-})
+//collisions
+  onCollide("enemy", "bullet", (e, b) =>{
+    destroy(b),
+    e.hurt(1)
+  })
+
+
 
 
 
