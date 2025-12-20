@@ -1,3 +1,5 @@
+//misc function
+
 function moveTowards(current, target, maxDelta) {
   const diff = target.sub(current)
   const dist = diff.len()
@@ -21,11 +23,15 @@ function gameOver() {
   ])
 }
 
-pSize = 32
-pBulletSize = 20
-enemySize = 32
+//global variables
+
+pSize = 32 //player size
+pBulletSize = 20 //player bullet size
+enemySize = 32 //enemy size
 
 let doUpdate = true
+
+//game functions
 
 kaboom({
     width:1080,
@@ -33,7 +39,32 @@ kaboom({
     background: [0,0,0],
 })
 
-function spawnBullet(p, dir){
+function gun(player) {
+  const gun = add([
+    rect(16, 8),
+    pos(player.pos.x + pSize / 2, player.pos.y),
+    anchor("center"),
+    z(3),
+    color(255, 100, 10),
+    area(),
+    {
+      lastShot: 0,
+      fireRate: 0.5,
+      damage: 1,
+      dir: vec2(0, 0),
+      shotSpeed: 800,
+      shoot() {
+        this.dir = player.shootingDir.clone()
+        if (time() - this.lastShot >= this.fireRate) {
+          spawnBullet(this.pos, this.dir, this)
+          this.lastShot = time()
+        }
+      },
+    }
+  ])
+}
+
+function spawnBullet(p, dir, weapon){
     return add([
     rect(pBulletSize, pBulletSize),
     pos(p),
@@ -43,8 +74,8 @@ function spawnBullet(p, dir){
     z(1),
     {
       dir: dir,
-      speed: 800,
-      damage: 1,
+      speed: weapon.shotSpeed,
+      damage: weapon.damage,
       update(){
         if(doUpdate){
           this.move(this.dir.x * this.speed, this.dir.y * this.speed)
@@ -98,6 +129,11 @@ function spawnEnemy(p) {
     enemy.move(push)
   })
 
+    enemy.onCollide("bullet", (b) =>{
+    destroy(b),
+    this.hurt(b.damage)
+  })
+
   return enemy
 }
 
@@ -109,15 +145,16 @@ function createPlayer(p) {
     color(0, 0, 255),
     area(),
     z(2),
-    health(1),
+    health(10),
     {
       dir: vec2(0, 0),
+      shootingDir: vec2(0, 0),
       vel: vec2(0, 0),
       maxSpeed: 500,
       accel: 5000,
       friction: 7500,
-      fireRate: 0.0001,
-      lastShot: 0,
+      weapons: [gun(this)],
+      currentWeapon: 0,
       targets: [
         vec2(1, 0),
         vec2(0, 1),
@@ -179,43 +216,27 @@ function createPlayer(p) {
 
   //shooting
   onKeyDown("right", () => {
-      p = player.pos.clone()
-      d = vec2(1, 0)
-
-      if (time() - player.lastShot >= player.fireRate) {
-          spawnBullet(p,d)
-          player.lastShot = time()
-      }
+    player.shootingDir = vec2(1, 0)
+    const current = player.current
+    player.weapons[current].shoot()
   })
 
   onKeyDown("left", () => {
-      p = player.pos.clone()
-      d = vec2(-1, 0)
-
-      if (time() - player.lastShot >= player.fireRate) {
-          spawnBullet(p,d)
-          player.lastShot = time()
-      }
+    player.shootingDir = vec2(1, 0)
+    const current = player.current
+    player.weapons[current].shoot()
   })
 
   onKeyDown("up", () => {
-      p = player.pos.clone()
-      d = vec2(0, -1)
-
-      if (time() - player.lastShot >= player.fireRate) {
-          spawnBullet(p,d)
-          player.lastShot = time()
-      }
+    player.shootingDir = vec2(1, 0)
+    const current = player.current
+    player.weapons[current].shoot()
   })
 
   onKeyDown("down", () => {
-      p = player.pos.clone()
-      d = vec2(0, 1)
-
-      if (time() - player.lastShot >= player.fireRate) {
-          spawnBullet(p,d)
-          player.lastShot = time()
-      }
+    player.shootingDir = vec2(1, 0)
+    const current = player.current
+    player.weapons[current].shoot()
   })
 
   onCollide("player", "enemy", (p, e) => {
@@ -234,44 +255,50 @@ function createPlayer(p) {
   return player
 }
 
-const spawner = add([
-  rect(64, 64),
-  pos(1000, 360),
-  anchor("center"),
-  area(),
-  health(20),
-  color(255, 0, 255),
-  z(2),
-  {
-    lastSpawned: 0,
-    spawnRate: 1,
-    dir: vec2(-1, 0),
-    dist: 50,
-    update(){
-      if(doUpdate){
-        const spawnPos = this.pos.add(this.dir.scale(this.dist))
-        if (time() - this.lastSpawned >= this.spawnRate) {
-          spawnEnemy(spawnPos)
-          this.lastSpawned = time()
+function createSpawner(p, dir) {
+  const spawner = add([
+    rect(64, 64),
+    pos(p),
+    anchor("center"),
+    area(),
+    health(20),
+    color(255, 0, 255),
+    z(2),
+    {
+      lastSpawned: 0,
+      spawnRate: 1,
+      dir: dir,
+      dist: 50,
+      update(){
+        if(doUpdate){
+          const spawnPos = this.pos.add(this.dir.scale(this.dist))
+          if (time() - this.lastSpawned >= this.spawnRate) {
+            spawnEnemy(spawnPos)
+            this.lastSpawned = time()
+          }
         }
+        
       }
-      
-    }
-  },
-  "spawner"
-])
+    },
+    "spawner"
+  ])
+
+  return spawner
+
+}
+
+//game logic
 
 player = createPlayer(vec2(540, 360))
 
 onKeyPress("space", () => {
-  doUpdate = !doUpdate
+  doUpdate = !doUpdate //        pauses / unpauses game
+}) 
+
+scene("level1", () => {
+  createSpawner()
 })
 
-//collisions
-  onCollide("enemy", "bullet", (e, b) =>{
-    destroy(b),
-    e.hurt(1)
-  })
 
 
 
