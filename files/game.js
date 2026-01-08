@@ -21,6 +21,20 @@ kaboom({
     background: [0,0,0],
 })
 
+function createTimer(duration) {
+  return {
+    time: duration,
+    update() {
+      if (!doUpdate) return
+
+      this.time -= dt()
+    },
+    isOver() {
+      return this.time <= 0
+    }
+  }
+}
+
 function spawnBullet(p, dir, dmg){
     return add([
     rect(pBulletSize, pBulletSize),
@@ -56,7 +70,7 @@ function spawnEnemy(p) {
     health(3),
     {
       target: vec2(0, 0),
-      speed: 100,
+      speed: 300,
       n: n, //target sul player scelto dal nemico
       update(){
         if(doUpdate){
@@ -94,6 +108,27 @@ function spawnEnemy(p) {
   return enemy
 }
 
+function gun(player) {
+  return {
+    fireRate: 0.5,
+    lastShot: 0,
+    damage: 1,
+
+    shoot() {
+      if (player.shootingDir.len() === 0) return
+
+      if (time() - this.lastShot >= this.fireRate) {
+        spawnBullet(
+          player.pos.clone(),
+          player.shootingDir.clone(),
+          this.damage
+        )
+        this.lastShot = time()
+      }
+    }
+  }
+}
+
 function spawnPlayer(p){
   const player = add([
     rect(pSize, pSize),
@@ -109,7 +144,7 @@ function spawnPlayer(p){
       maxSpeed: 500,
       accel: 5000,
       friction: 7500,
-      weapons : [gun(this)],
+      weapons : [],
       currentWeapon: 0,
       shootingDir: vec2(0, 0),
       targets: [
@@ -134,10 +169,12 @@ function spawnPlayer(p){
           this.move(this.vel)
         }
         
-      }  
+      }
     },
     "player",
   ])
+
+  player.weapons.push(gun(player))
 
   //moving right
   onKeyDown("d", () => {
@@ -171,53 +208,107 @@ function spawnPlayer(p){
   //shooting
 
   onKeyDown("right", () => {
-      p = player.pos.clone()
-      d = vec2(1, 0)
-
-      if (time() - player.lastShot >= player.fireRate) {
-          spawnBullet(p,d, 1)
-          player.lastShot = time()
-      }
+    player.shootingDir = vec2(1, 0)
+    player.weapons[player.currentWeapon].shoot()
   })
 
   onKeyDown("left", () => {
-      p = player.pos.clone()
-      d = vec2(-1, 0)
-
-      if (time() - player.lastShot >= player.fireRate) {
-          spawnBullet(p,d, 1)
-          player.lastShot = time()
-      }
+    player.shootingDir = vec2(-1, 0)
+    player.weapons[player.currentWeapon].shoot()
   })
 
   onKeyDown("up", () => {
-      p = player.pos.clone()
-      d = vec2(0, -1)
-
-      if (time() - player.lastShot >= player.fireRate) {
-          spawnBullet(p,d, 1)
-          player.lastShot = time()
-      }
+    player.shootingDir = vec2(0, -1)
+    player.weapons[player.currentWeapon].shoot()
   })
 
   onKeyDown("down", () => {
-      p = player.pos.clone()
-      d = vec2(0, 1)
-
-      if (time() - player.lastShot >= player.fireRate) {
-          spawnBullet(p,d, 1)
-          player.lastShot = time()
-      }
+    player.shootingDir = vec2(0, 1)
+    player.weapons[player.currentWeapon].shoot()
   })
 
   player.onCollide("enemy", () => {
     player.hurt(1)
   })
 
+  player.onDeath(() => {
+    doUpdate = false
+    showGameOver()
+  })
+
   return player
 }
 
-function createSpawner(p, rate){
+function createHealthBar(entity, maxHealth) {
+
+  const width = 200
+  const height = 20
+
+  const bg = add([
+    rect(width, height),
+    pos(20, 20),
+    color(100, 0, 0),
+    fixed(),   // 👈 NON segue la camera
+    z(100),
+  ])
+
+  const bar = add([
+    rect(width, height),
+    pos(20, 20),
+    color(0, 200, 0),
+    fixed(),
+    z(101),
+    {
+      update() {
+        const ratio = entity.hp() / maxHealth
+        this.width = width * Math.max(ratio, 0)
+      }
+    }
+  ])
+
+  return {bg, bar}
+}
+
+function showGameOver() {
+  add([
+    text("GAME OVER", { size: 48 }),
+    pos(width() / 2, height() / 2),
+    anchor("center"),
+    fixed(),
+    z(100),
+    color(255, 0, 0),
+  ])
+
+  add([
+    text("Premi R per ricominciare", { size: 16 }),
+    pos(width() / 2, height() / 2 + 60),
+    anchor("center"),
+    fixed(),
+    z(100),
+  ])
+}
+
+function levelCompleted() {
+  add([
+    text("YOU WIN", { size: 32 }),
+    pos(width() / 2, height() / 2),
+    anchor("center"),
+    fixed(),
+    z(100),
+    color(255, 0, 0),
+    {
+      timer: createTimer(3),
+      update() {
+        this.timer.update()
+        if (timer.isOver()) {
+          go("levelComplete")
+        }
+      }
+    }
+  ])
+}
+
+function createSpawner(p, rate, dir){
   const spawner = add([
     rect(64, 64),
     pos(p),
@@ -229,7 +320,7 @@ function createSpawner(p, rate){
     {
       lastSpawned: 0,
       spawnRate: rate,
-      dir: vec2(-1, 0),
+      dir: dir,
       dist: 50,
       update(){
         if(doUpdate){
@@ -248,42 +339,116 @@ function createSpawner(p, rate){
   return spawner
 }
 
-function gun(player){
-  const gun = add([
-    pos(vec2(0, 0)),
-    {
-      fireRate : 0.75,
-      lastShot : 0,
-      damage : 1,
-      update(){
-        this.pos = player.pos.clone()
-      },
-      shoot(dir){
-        if (time() - this.lastShot >= this.fireRate) {
-          spawnBullet(this.pos, dir, this.damage)
-          this.lastShot = time()
-      }
-      }
-    }
+scene("levelComplete", ()=> {
+  add([
+    area(100, 30),
+    text("LEVEL COMPLETED", { size: 48 }),
+    pos(width() / 2, height() / 2),
+    anchor("center"),
+    fixed(),
+    z(100),
   ])
-
-  return gun
-}
-
-scene("level1", () => {
-  player = spawnPlayer(vec2(100, 100))
-
-  spawner = createSpawner(vec2(1000, 360), 3)
-
-  
-  //pausing
-    onKeyPress("space", () => {
-      doUpdate = !doUpdate
-    })
 })
 
-go("level1")
+scene("level1", () => {
+  player = spawnPlayer(vec2(100, height() / 2))
+  createHealthBar(player, 5)
 
+  spawner = createSpawner(vec2(1000, 360), 3, vec2(-1, 0))
+  
+  timer = createTimer(30)
 
+  onUpdate(() => {
+    timer.update()
+
+    if (timer.isOver()) {
+      levelCompleted()
+    }
+    
+  })
+
+  //pausing
+  onKeyPress("space", () => {
+    if (!timer.isOver()) {
+      doUpdate = !doUpdate 
+    }
+  })
+
+  onKeyPress("r", () => {
+    go("level1")
+  })
+})
+
+scene("level2", () => {
+  player = spawnPlayer(vec2(width() / 2, height() / 2))
+  createHealthBar(player, 5)
+
+  spawner1 = createSpawner(vec2(1000, 360), 3, vec2(-1, 0))
+
+  spawner2 = createSpawner(vec2(100, 360), 3, vec2(1, 0))
+  
+  timer = createTimer(45)
+
+  onUpdate(() => {
+    timer.update()
+
+    if (timer.isOver()) {
+      levelCompleted()
+    }
+    
+  })
+
+  //pausing
+  onKeyPress("space", () => {
+    if (!timer.isOver()) {
+      doUpdate = !doUpdate 
+    }
+  })
+
+  onKeyPress("r", () => {
+    go("level2")
+  })
+})
+
+scene("level3", () => {
+  player = spawnPlayer(vec2(width() / 2, height() / 2))
+  createHealthBar(player, 5)
+
+  spawner1 = createSpawner(vec2(1000, 360), 3, vec2(-1, 0))
+
+  spawner2 = createSpawner(vec2(100, 360), 3, vec2(1, 0))
+  
+  timer = createTimer(60)
+
+  onUpdate(() => {
+    timer.update()
+
+    if (timer.isOver()) {
+      levelCompleted()
+    }
+    
+  })
+
+  //pausing
+  onKeyPress("space", () => {
+    if (!timer.isOver()) {
+      doUpdate = !doUpdate 
+    }
+  })
+
+  onKeyPress("r", () => {
+    go("level3")
+  })
+})
+
+scene("home", () => {
+  
+})
+
+scene("game", () => {
+  
+})
+
+go("level2")
 
 
