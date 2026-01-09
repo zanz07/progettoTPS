@@ -1,12 +1,106 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="it">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Progetto TPS</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Progetto TPS</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background-color: #111;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      height: 100vh;
+    }
+
+    header {
+      width: 100%;
+      background-color: #222;
+      padding: 10px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-sizing: border-box;
+    }
+
+    header button {
+      background-color: #444;
+      color: white;
+      border: none;
+      padding: 8px 12px;
+      margin-left: 5px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    header button:hover {
+      background-color: #666;
+    }
+
+    #game-container {
+      margin-top: 20px;
+      flex: 1;
+      width: 1080px;
+      height: 720px;
+      border: 2px solid #444;
+      position: relative;
+    }
+
+    input[type="file"] {
+      display: none;
+    }
+
+    label[for="load-file"] {
+      background-color: #444;
+      color: white;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-size: 14px;
+      margin-left: 5px;
+    }
+
+    label[for="load-level"] {
+      background-color: #444;
+      color: white;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-size: 14px;
+      margin-left: 5px;
+    }
+
+    label[for="load-file"]:hover {
+      background-color: #666;
+    }
+
+    label[for="load-level"]:hover {
+      background-color: #666;
+    }
+  </style>
 </head>
 <body>
-    <script src="https://unpkg.com/kaboom/dist/kaboom.js"></script>
-    <script src="game.js"></script>
+  <header>
+    <div>
+      <button id="save-btn">Salva</button>
+      <label for="load-file">Carica</label>
+      <input type="file" id="load-file" accept=".json">
+      <button id="import-btn">Importa salvataggio</button>
+
+      <label for="load-level">Carica livello</label>
+      <input type="file" id="load-level" accept=".json">
+      <button id="importLVL-btn">Importa un livello</button>
+
+      <button id="blueprint">Scarica base livello</button>
+    </div>
+    <h1>Progetto TPS</h1>
+  </header>
+
+  <div id="game-container"></div>
+
+  <script src="https://unpkg.com/kaboom/dist/kaboom.js"></script>
+  <script src="script.js" ></script>
 </body>
 </html>
